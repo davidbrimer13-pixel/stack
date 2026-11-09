@@ -14,31 +14,36 @@ START_DELAY = 400
 MIN_DELAY = 90
 
 
+def count_rows(rows):
+    """Count settled rows without relying on len()."""
+    count = 0
+    for row in rows:
+        count += 1
+    return count
+
+
 def draw_game(rows, moving_x, moving_width):
     """Draw the newest four settled rows and the row currently moving."""
     basic.clear_screen()
 
-    visible_rows = rows[-4:]
-    for row_index in range(len(visible_rows)):
-        y = 4 - row_index
-        mask = visible_rows[len(visible_rows) - 1 - row_index]
-        for x in range(WIDTH):
-            if mask & (1 << x):
-                led.plot(x, y)
+    row_count = count_rows(rows)
+    first_visible = row_count - 4
+    if first_visible < 0:
+        first_visible = 0
 
-    moving_y = 4 - len(visible_rows)
+    row_index = 0
+    for mask in rows:
+        if row_index >= first_visible:
+            y = 4 - (row_index - first_visible)
+            for x in range(WIDTH):
+                if mask & (1 << x):
+                    led.plot(x, y)
+        row_index += 1
+
+    visible_count = row_count - first_visible
+    moving_y = 4 - visible_count
     for x in range(moving_x, moving_x + moving_width):
         led.plot(x, moving_y)
-
-
-def wait_for_drop():
-    """Wait for a fresh A-button press, so holding A won't drop twice."""
-    while input.button_is_pressed(Button.A):
-        basic.pause(20)
-    while not input.button_is_pressed(Button.A):
-        basic.pause(20)
-    while input.button_is_pressed(Button.A):
-        basic.pause(20)
 
 
 def game_over(score):
@@ -70,7 +75,7 @@ def play_game():
                 overlap = ((1 << block_width) - 1) << moving_x
                 overlap &= rows[-1]
                 if overlap == 0:
-                    return len(rows)
+                    return count_rows(rows)
                 block_width = 0
                 for x in range(WIDTH):
                     if overlap & (1 << x):
@@ -83,7 +88,7 @@ def play_game():
                 rows.append(((1 << block_width) - 1) << moving_x)
 
             if block_width == 1:
-                return len(rows)
+                return count_rows(rows)
 
         button_was_pressed = pressed
 
@@ -96,13 +101,11 @@ def play_game():
             moving_x = 0
             direction = 1
 
-        delay = max(MIN_DELAY, START_DELAY - len(rows) * 25)
+        row_count = count_rows(rows)
+        delay = START_DELAY - row_count * 25
+        if delay < MIN_DELAY:
+            delay = MIN_DELAY
         basic.pause(delay)
-
-
-def wait_for_button_release(button):
-    while input.button_is_pressed(button):
-        basic.pause(20)
 
 
 while True:
